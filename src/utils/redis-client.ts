@@ -85,7 +85,7 @@ class RedisModel<T extends RedisModelTemplate> {
    */
   public async delete(key: string) {
     await this.waitWhenReady()
-    return this.client.del(key)
+    return this.client.del(this.fullKey(key))
   }
 
   /**
