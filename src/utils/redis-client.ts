@@ -11,7 +11,8 @@ import * as crypto from "crypto"
  * and interactions with Redis for a given schema template.
  */
 class RedisModel<T extends RedisModelTemplate> {
-  protected readonly client: RedisClientType<any, any, any, any, any>
+  /** Original redis client */
+  public readonly client: RedisClientType<any, any, any, any, any>
   protected readonly template: T
   protected readonly options: Required<Omit<RedisModelOptions, "ttl">> & { ttl?: number }
   protected readonly randomKeyBytesCount: number = 16
@@ -53,6 +54,14 @@ class RedisModel<T extends RedisModelTemplate> {
     else this.client.set(this.fullKey(key), serializedValue)
 
     return key
+  }
+
+  /**
+   * Expire key after specific ttl or date
+   */
+  public async expire(key: string, ttl: number | Date, mode?: "NX" | "XX" | "GT" | "LT") {
+    if (typeof ttl === "number") this.client.expire(key, ttl, mode)
+    else this.client.expireAt(key, ttl, mode)
   }
 
   /**
