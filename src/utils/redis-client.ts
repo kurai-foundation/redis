@@ -12,7 +12,7 @@ import * as crypto from "crypto"
  */
 class RedisModel<T extends RedisModelTemplate> {
   /** Original redis client */
-  public readonly client: RedisClientType<any, any, any, any, any>
+  protected readonly client: RedisClientType<any, any, any, any, any>
   protected readonly template: T
   protected readonly options: Required<Omit<RedisModelOptions, "ttl">> & { ttl?: number }
   protected readonly randomKeyBytesCount: number = 16
@@ -177,11 +177,11 @@ class RedisModel<T extends RedisModelTemplate> {
  * Redis client abstraction
  */
 export default class RedisClient {
-  readonly #client: RedisClientType<any, any, any, any, any>
+  public readonly client: RedisClientType<any, any, any, any, any>
   readonly #clientConfig: Partial<ClientConfiguration>
 
   constructor(client: RedisClientType<any, any, any, any, any>, clientConfig?: Partial<ClientConfiguration>) {
-    this.#client = client
+    this.client = client
     this.#clientConfig = clientConfig || {}
   }
 
@@ -203,19 +203,19 @@ export default class RedisClient {
    * @returns a RedisSchema instance for data operations.
    */
   public model<T extends RedisModelTemplate>(template: T, options?: RedisModelOptions): RedisModel<T> {
-    return new RedisModel(this.#client, template, options, this.#clientConfig)
+    return new RedisModel(this.client, template, options, this.#clientConfig)
   }
 
   /**
    * Disconnects and cleans up the Redis client.
    */
   public destroy() {
-    this.#client.destroy()
+    this.client.destroy()
   }
 
   public async connect() {
-    await this.#client.connect()
+    await this.client.connect()
 
-    return this.#client
+    return this.client
   }
 }
