@@ -48,7 +48,6 @@
   },
   "homepage": "https://github.com/kurai-foundation/redis#readme",
   "peerDependencies": {
-    "@sigiljs/seal": "^1.1.0",
     "redis": "^5.8.1",
     "jsonpack": "^1.1.5"
   }

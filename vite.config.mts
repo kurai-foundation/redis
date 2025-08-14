@@ -27,7 +27,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         ...builtinModules,
-        "@sigiljs/seal",
+        "jsonpack",
         "redis"
       ],
       output: { exports: "named", preserveModules: true, interop: "auto" }

@@ -31,9 +31,6 @@ export { client }
 
 ### Define template and model
 
-_Note: for templates, redis plugin uses `@sigiljs/seal`, so you can create
-templates by your own, without `.template()` helper_
-
 ```typescript
 const userModel = redis.defineSchema<{ userId: string }>({
   // Optional, time in seconds after which record
