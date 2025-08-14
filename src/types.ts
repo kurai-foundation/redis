@@ -1,5 +1,4 @@
 import { RedisClientOptions } from "@redis/client"
-import { ArraySchema, BasePrimitive, NullableSchema, ObjectSchema } from "@sigiljs/seal"
 import { RedisClientType } from "redis"
 
 export interface ClientConfiguration {
@@ -12,23 +11,18 @@ export interface ClientConfiguration {
   /**
    * Length of the generated namespace length
    *
-   * Does not apply when namespace specified manually
+   * Does not apply when namespace is specified manually
    *
    * @default 8
    */
   randomNamespaceLength: number
 }
 
-export type RedisModelTemplate = BasePrimitive<any>
-  | ArraySchema<BasePrimitive<any> | NullableSchema<BasePrimitive<any>>>
-  | NullableSchema<BasePrimitive<any>>
-  | ObjectSchema<any>
-
 export interface RedisModelOptions {
   /** Time in seconds after which record will be deleted */
   ttl?: number
   /**
-   * Delete record after first successful read
+   * Delete record after the first successful read
    *
    * @deafult false
    */
@@ -36,15 +30,15 @@ export interface RedisModelOptions {
   /**
    * Model namespace
    *
-   * When not set, namespace automatically generates from template as follows:
+   * When not set, namespace automatically generates from the template as follows:
    * @example
    * createHash("shake256", { outputLength: config?.randomNamespaceLength || 8 })
-   *   .update(JSON.stringify([seal.exportMetadataOf(template), options || {}]))
+   *   .update(JSON.stringify([options]))
    *   .digest("base64url")
    *
    * @default shake256 hash
    */
-  namespace?: string
+  namespace: string
 }
 
 export type RedisOptions = RedisClientOptions & Partial<ClientConfiguration>

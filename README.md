@@ -35,14 +35,7 @@ _Note: for templates, redis plugin uses `@sigiljs/seal`, so you can create
 templates by your own, without `.template()` helper_
 
 ```typescript
-import { client } from "./foundation.ts"
-
-const template = client.template({
-  userId: seal.string,
-  userName: seal.string.nullable
-})
-
-const userModel = Sigil.redis.defineSchema(template, {
+const userModel = redis.defineSchema<{ userId: string }>({
   // Optional, time in seconds after which record
   // will be deleted, default - undefined
   ttl: 120,
@@ -62,7 +55,7 @@ const userModel = Sigil.redis.defineSchema(template, {
 > Note: any redis operations should be performed **only** after
 > calling the `.connect()` method of the client
 
-Using set, set with random key and get:
+Using a set, set with a random key and get:
 ```typescript
 const key = await userModel.set("key1", {
   userId: "1234567890"

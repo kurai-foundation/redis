@@ -25,6 +25,7 @@
   "author": "Kurai Foundation",
   "license": "MIT",
   "devDependencies": {
+    "@types/jsonpack": "^1.1.6",
     "@types/node": "^22.15.18",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
@@ -48,6 +49,7 @@
   "homepage": "https://github.com/kurai-foundation/redis#readme",
   "peerDependencies": {
     "@sigiljs/seal": "^1.1.0",
-    "redis": "^5.8.1"
+    "redis": "^5.8.1",
+    "jsonpack": "^1.1.5"
   }
 }

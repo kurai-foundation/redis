@@ -1,31 +1,27 @@
-import { ObjectSchema, seal } from "@sigiljs/seal"
-import { InferSchema } from "@sigiljs/seal/types"
 import { createHash } from "node:crypto"
 import { RedisClientType } from "redis"
-import { AnyRedisClient, ClientConfiguration, RedisModelOptions, RedisModelTemplate } from "~/types"
-import sealJsonParser from "./seal-json-parser"
+import { AnyRedisClient, ClientConfiguration, RedisModelOptions } from "~/types"
 import * as crypto from "crypto"
+import { pack, unpack } from "jsonpack"
 
 /**
  * Executor class that handles serialization, compression,
  * and interactions with Redis for a given schema template.
  */
-class RedisModel<T extends RedisModelTemplate> {
+class RedisModel<T> {
   /** Original redis client */
   protected readonly client: RedisClientType<any, any, any, any, any>
-  protected readonly template: T
   protected readonly options: Required<Omit<RedisModelOptions, "ttl">> & { ttl?: number }
   protected readonly randomKeyBytesCount: number = 16
 
   /**
    * @param client redis client instance
-   * @param template seal schema template
    * @param options schema options
    * @param config
    */
-  constructor(client: AnyRedisClient, template: T, options?: RedisModelOptions, config?: Partial<ClientConfiguration>) {
+  constructor(client: AnyRedisClient, options: RedisModelOptions, config?: Partial<ClientConfiguration>) {
     const namespace = options?.namespace ?? createHash("shake256", { outputLength: config?.randomNamespaceLength || 8 })
-      .update(JSON.stringify([seal.exportMetadataOf(template), options || {}]))
+      .update(JSON.stringify([options]))
       .digest("base64url")
 
     this.client = client
@@ -34,7 +30,6 @@ class RedisModel<T extends RedisModelTemplate> {
       readOnce: options?.readOnce ?? false,
       namespace
     }
-    this.template = template
     if (config?.randomKeyBytesCount) this.randomKeyBytesCount = config.randomKeyBytesCount
   }
 
@@ -45,9 +40,9 @@ class RedisModel<T extends RedisModelTemplate> {
    * @param value value to store.
    * @returns key used in Redis (without namespace).
    */
-  public async set(key: string, value: InferSchema<T>): Promise<string> {
+  public async set(key: string, value: T): Promise<string> {
     await this.waitWhenReady()
-    const serializedValue = JSON.stringify(this.serialize(value))
+    const serializedValue = pack(value as any)
     if (typeof this.options.ttl === "number") {
       this.client.setEx(this.fullKey(key), this.options.ttl, serializedValue)
     }
@@ -57,7 +52,7 @@ class RedisModel<T extends RedisModelTemplate> {
   }
 
   /**
-   * Expire key after specific ttl or date
+   * Expire key after a specific ttl or date
    */
   public async expire(key: string, ttl: number | Date, mode?: "NX" | "XX" | "GT" | "LT") {
     if (typeof ttl === "number") this.client.expire(key, ttl, mode)
@@ -67,12 +62,12 @@ class RedisModel<T extends RedisModelTemplate> {
   /**
    * Retrieves data from Redis and validates it against the template.
    *
-   * @param key key in Redis (without namespace).
+   * @param key key in Redis (without a namespace).
    * @param force if true, throws an error instead of returning null when
    * data is missing or fails validation.
    * @returns parsed data matching the template, or null if not in force mode.
    */
-  public async get<F extends boolean | undefined>(key: string, force?: F): Promise<F extends true ? InferSchema<T> : InferSchema<T> | null> {
+  public async get<F extends boolean | undefined>(key: string, force?: F): Promise<F extends true ? T : T | null> {
     await this.waitWhenReady()
     const rawValue = await this.client.get(this.fullKey(key))
     if (!rawValue) {
@@ -83,13 +78,13 @@ class RedisModel<T extends RedisModelTemplate> {
 
     if (this.options.readOnce) this.delete(key)
 
-    return sealJsonParser(Buffer.isBuffer(rawValue) ? rawValue.toString("utf8") : rawValue, this.template) as any
+    return unpack(Buffer.isBuffer(rawValue) ? rawValue.toString("utf8") : rawValue)
   }
 
   /**
    * Deletes the specified key from Redis.
    *
-   * @param key key to delete (without namespace).
+   * @param key key to delete (without a namespace).
    * @returns result of the deletion operation.
    */
   public async delete(key: string) {
@@ -105,7 +100,7 @@ class RedisModel<T extends RedisModelTemplate> {
    * @param callback function to execute with the retrieved payload.
    * @returns callback result or null if no data.
    */
-  public async with<R extends any>(key: string, callback: (payload: InferSchema<T>) => R): Promise<R | null> {
+  public async with<R extends any>(key: string, callback: (payload: T) => R): Promise<R | null> {
     const payload = await this.get(key)
     if (payload) return callback(payload)
     return null
@@ -121,9 +116,9 @@ class RedisModel<T extends RedisModelTemplate> {
        * Compresses and writes the value under a random key.
        *
        * @param value value to store.
-       * @returns generated Redis key (without namespace).
+       * @returns generated a Redis key (without a namespace).
        */
-      set(value: InferSchema<T>): Promise<string> {
+      set(value: T): Promise<string> {
         const key = crypto.randomBytes(executor.randomKeyBytesCount).toString("base64url")
         return executor.set(key, value)
       }
@@ -132,22 +127,6 @@ class RedisModel<T extends RedisModelTemplate> {
 
   private fullKey(key: string) {
     return this.options.namespace + "+" + key
-  }
-
-  private serialize(payload: any): Array<any> {
-    if (typeof payload !== "object") return payload
-
-    const schemaShapeKeys = Object.keys(seal.exportMetadataOf(this.template).shape || {})
-    if (schemaShapeKeys.length) {
-      const response: any[] = []
-      for (const key of schemaShapeKeys) {
-        const v = payload[key]
-        response.push((v && typeof v === "object") ? this.serialize(v) : v)
-      }
-      return response
-    }
-
-    return Object.values(payload).map(v => (v && typeof v === "object") ? this.serialize(v) : v)
   }
 
   private async waitWhenReady() {
@@ -186,24 +165,13 @@ export default class RedisClient {
   }
 
   /**
-   * Creates a new object schema template compatible with Seal.
-   *
-   * @param template schema definition.
-   * @returns an ObjectSchema based on the provided template.
-   */
-  public template<T extends { [key: string]: RedisModelTemplate }>(template: T): ObjectSchema<T> {
-    return seal.object(template)
-  }
-
-  /**
    * Defines a new data schema with the given template and options.
    *
-   * @param template redis schema template.
    * @param options schema options.
    * @returns a RedisSchema instance for data operations.
    */
-  public model<T extends RedisModelTemplate>(template: T, options?: RedisModelOptions): RedisModel<T> {
-    return new RedisModel(this.client, template, options, this.#clientConfig)
+  public model<T>(options: RedisModelOptions): RedisModel<T> {
+    return new RedisModel(this.client, options, this.#clientConfig)
   }
 
   /**
